@@ -123,19 +123,31 @@ stages:
       displayName: 'Use .NET SDK $(dotnetSdkVersion)'
       inputs:
         version: '$(dotnetSdkVersion)'
+
+    # 1) Publish the web app for local hosting on the Windows agent
     - task: DotNetCoreCLI@2
-      displayName: 'Build the project - $(buildConfiguration)'
+      displayName: 'Publish web app'
       inputs:
-        command: 'build'
-        arguments: '--configuration $(buildConfiguration)'
-        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
+        command: 'publish'
+        arguments: '--configuration $(buildConfiguration) --output $(Pipeline.Workspace)/app'
+        projects: '**/Tailspin.SpaceGame.Web.csproj'
+
+    # 2) Start the web app in the background
+    - powershell: |
+        Write-Host "Starting the WebApp…"
+        Start-Process dotnet -WorkingDirectory "$(Pipeline.Workspace)/app" `
+        -ArgumentList 'Tailspin.SpaceGame.Web.dll --urls http://localhost:5000'
+        Start-Sleep -Seconds 15
+      displayName: 'Launch WebApp locally'
+
+      # 3) Now run your integration/UI tests against http://localhost:5000
     - task: DotNetCoreCLI@2
-      displayName: 'Run unit tests - $(buildConfiguration)'
+      displayName: 'Run UI tests - $(buildConfiguration)'
       inputs:
         command: 'test'
+        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
         arguments: '--no-build --configuration $(buildConfiguration)'
         publishTestResults: true
-        projects: '$(System.DefaultWorkingDirectory)/**/*UITests.csproj'
 
 - stage: 'Staging'
   displayName: 'Deploy to the staging environment'
